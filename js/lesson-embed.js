@@ -51,9 +51,9 @@
       toc.querySelectorAll('.toc-list a').forEach(a => a.addEventListener('click', () => { if (isMobile()) setToc(false); }));
       let lastMobile = isMobile();
       window.addEventListener('resize', () => { if (isMobile() !== lastMobile) { lastMobile = isMobile(); setToc(false); } });
-      // 교시 토글을 펼치면 목차도 자동으로 열림 (PC). 모바일은 본문을 가리지 않도록 닫힌 채 유지
+      // 교시 토글을 펼칠 때 목차는 항상 닫힌 상태로 시작 (오른쪽 '목차' 버튼으로 열기)
       const lessonItem = scope.closest('details');
-      if (lessonItem) lessonItem.addEventListener('toggle', () => { if (lessonItem.open && !isMobile()) setToc(true); });
+      if (lessonItem) lessonItem.addEventListener('toggle', () => { if (lessonItem.open) setToc(false); });
     }
 
     // ===== 교시 TOP: 해당 교시 첫 영역(아코디언 머리)으로 이동 =====
