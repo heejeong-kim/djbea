@@ -38,6 +38,21 @@ function setStep(i) {
   pct.textContent = p + '%';
 }
 
+// 가장 긴 프롬프트가 들어갈 높이를 미리 확보 (타이핑 중 줄 수가 바뀌어 히어로 높이가 출렁이는 현상 방지)
+const promptBox = typed ? typed.closest('.prompt') : null;
+function reservePromptHeight() {
+  if (!promptBox) return;
+  const keep = typed.textContent;
+  promptBox.style.minHeight = '';
+  let max = 0;
+  for (const p of prompts) { typed.textContent = p; max = Math.max(max, promptBox.offsetHeight); }
+  typed.textContent = keep;
+  promptBox.style.minHeight = max + 'px';
+}
+reservePromptHeight();
+let prt; window.addEventListener('resize', () => { clearTimeout(prt); prt = setTimeout(reservePromptHeight, 150); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(reservePromptHeight); // 웹폰트 적용 후 다시 계산
+
 async function run() {
   if (reduce) { // 모션 최소화 환경: 완료 상태로 고정
     typed.textContent = prompts[4];

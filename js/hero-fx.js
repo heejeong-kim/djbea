@@ -11,17 +11,22 @@
   const ROTATE_MS = 12000; // 자동 전환 간격 (12초)
   const LABEL = { waves: '물결', docs: '문서 흐름' };
   let mode = MODES.includes(hero.dataset.fx) ? hero.dataset.fx : MODES[Math.floor(Math.random() * MODES.length)];
-  let w = 0, h = 0, dpr = 1, t = 0, running = true, rafId = 0;
+  let w = 0, h = 0, dpr = 1, t = 0, running = true, rafId = 0, lastTs = 0;
+  let fadeA = 1, fadeTarget = 1; // 모드 전환용 캔버스 내부 페이드(CSS 깜빡임 방지)
   const pointer = { x: -9999, y: -9999 };
 
   // ---------- 공통: 캔버스 크기 ----------
   function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    w = hero.clientWidth; h = hero.clientHeight;
-    canvas.width = w * dpr; canvas.height = h * dpr;
+    const nd = Math.min(window.devicePixelRatio || 1, 2);
+    const nw = hero.clientWidth, nh = hero.clientHeight;
+    if (nw === w && nh === h && nd === dpr) return;      // 크기 변화 없으면 캔버스를 비우지 않음
+    const reflow = Math.abs(nw - w) > 80 || w === 0;     // 높이만 바뀐 경우(모바일 주소창 등)는 장면 유지
+    dpr = nd; w = nw; h = nh;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     measureText();
-    init();
+    if (reflow) init();
+    draw();                                              // 캔버스 초기화 직후 바로 다시 그려 빈 프레임 방지
   }
 
   // 왼쪽 텍스트 영역(공식 교육명 ~ 교육 대상)의 위치 — 문서 아이콘이 이 위에 그려지지 않게 함
@@ -99,22 +104,25 @@
   function drawDocs() {
     const scanY = h * .45; // 이 높이를 지나면 'AI 처리 완료'로 바뀜
     // 스캔 라인
+    let k60 = drawDocs.k60 || 1;
     const g = ctx.createLinearGradient(textBox && textBox.r < w * .75 ? textBox.r : 0, 0, w, 0);
     g.addColorStop(0, 'rgba(110,231,200,0)'); g.addColorStop(.5, 'rgba(110,231,200,.35)'); g.addColorStop(1, 'rgba(110,231,200,0)');
     const lineX = textBox && textBox.r < w * .75 ? Math.max(0, textBox.r) : 0; // 텍스트 영역 위로는 선을 긋지 않음
     ctx.fillStyle = g; ctx.fillRect(lineX, scanY, w - lineX, 1.5);
 
     for (const d of docs) {
-      d.y -= d.vy; d.rot += d.vr; d.sway += .01;
+      d.y -= d.vy * k60; d.rot += d.vr * k60; d.sway += .01 * k60;
       const x = d.x + Math.sin(d.sway) * 10;
       if (!d.done && d.y < scanY) { d.done = true; d.glow = 1; }
-      d.glow *= .97;
+      d.glow *= Math.pow(.97, k60);
       const ww = d.size * .78, hh = d.size;
       ctx.save();
       ctx.translate(x, d.y); ctx.rotate(d.rot);
       const fade = textFade(x, d.y, d.size);
       if (fade <= 0) { ctx.restore(); continue; }
-      ctx.globalAlpha = Math.min(1, (h - d.y) / 120, (d.y + hh) / 140) * .9 * fade;
+      const a = Math.min(1, (h - d.y) / 120, (d.y + hh) / 140) * .9 * fade;
+      if (a <= 0) { ctx.restore(); continue; }           // 음수 알파는 무시되어 순간 표시될 수 있으므로 건너뜀
+      ctx.globalAlpha = a;
       // 카드 본체 (글래스)
       roundRect(-ww / 2, -hh / 2, ww, hh, 7);
       ctx.fillStyle = d.done ? 'rgba(18,168,138,.16)' : 'rgba(255,255,255,.06)';
@@ -152,17 +160,31 @@
     t = 0;
     docs = Array.from({ length: Math.round(Math.min(26, Math.max(10, w / 70))) }, () => makeDoc(true));
   }
-  function frame() {
-    t += 1 / 60;
+  function draw() {
     ctx.clearRect(0, 0, w, h);
+    ctx.save();
+    ctx.globalAlpha = fadeA;
     if (mode === 'waves') drawWaves();
     else drawDocs();
+    ctx.restore();
+  }
+  function frame(ts) {
+    const dt = lastTs ? Math.min((ts - lastTs) / 1000, 1 / 20) : 1 / 60; // 탭 복귀 시 급격한 점프 방지
+    lastTs = ts;
+    t += dt;
+    drawDocs.k60 = dt * 60;
+    // 전환 페이드: 0.7초에 걸쳐 부드럽게 변화
+    if (fadeA !== fadeTarget) {
+      const step = dt / .7;
+      fadeA = fadeTarget > fadeA ? Math.min(fadeTarget, fadeA + step) : Math.max(fadeTarget, fadeA - step);
+    }
+    draw();
     if (running) rafId = requestAnimationFrame(frame);
   }
 
   // 히어로가 보일 때만 재생 (성능)
   new IntersectionObserver(([e]) => {
-    running = e.isIntersecting; cancelAnimationFrame(rafId);
+    running = e.isIntersecting; cancelAnimationFrame(rafId); lastTs = 0;
     if (running) rafId = requestAnimationFrame(frame);
   }).observe(hero);
 
@@ -181,13 +203,13 @@
   function switchMode(next) {
     if (fading) return;
     fading = true;
-    canvas.classList.add('is-fading');
+    fadeTarget = 0;                                    // 캔버스 안에서 서서히 어두워짐
     setTimeout(() => {
       mode = next ?? MODES[(MODES.indexOf(mode) + 1) % MODES.length];
       init(); syncBtn();
-      canvas.classList.remove('is-fading');
-      fading = false;
-    }, 600);
+      fadeTarget = 1;                                  // 새 장면이 서서히 나타남
+      setTimeout(() => { fading = false; }, 750);
+    }, 750);
   }
   let timer = setInterval(() => { if (running) switchMode(); }, ROTATE_MS);
   if (btn) btn.addEventListener('click', () => {
@@ -196,6 +218,8 @@
     timer = setInterval(() => { if (running) switchMode(); }, ROTATE_MS);
   });
 
-  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(resize, 150); });
+  let rt; const onResize = () => { clearTimeout(rt); rt = setTimeout(resize, 150); };
+  window.addEventListener('resize', onResize);
+  if ('ResizeObserver' in window) new ResizeObserver(onResize).observe(hero); // 히어로 높이 변화도 반영
   resize(); syncBtn();
 })();
