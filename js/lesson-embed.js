@@ -23,9 +23,7 @@
       history.replaceState(null, '', '#' + id);
     });
   });
-  // 2교시는 작업 화면에서도 기본 접힘. 제목이나 교시 링크로 다시 펼칠 수 있습니다.
-  const lesson2 = document.getElementById('lesson-2');
-  if (lesson2) lesson2.open = false;
+  // 1~4교시는 모두 기본 펼침(details에 open 속성). 제목을 누르면 접을 수 있습니다.
   if (/^#lesson-\d$/.test(location.hash) && location.hash !== '#lesson-2') {
     openLesson(location.hash.slice(1));
   }

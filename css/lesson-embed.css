@@ -584,8 +584,8 @@
 .lesson-scope .flow-line li:last-child::before{background:#0b8a7c}
 .lesson-scope .deliver{background:#e3f5f2;color:#0b6157}
 .lesson-scope .check-points li::before{background:#e3f5f2;color:#0b8a7c}
-#lesson-2 .check-points li{padding-left:16px}
-#lesson-2 .check-points li::before{
+:is(#lesson-2,#lesson-3,#lesson-4) .check-points li{padding-left:16px}
+:is(#lesson-2,#lesson-3,#lesson-4) .check-points li::before{
   content:"";top:.65em;left:2px;width:6px;height:6px;background:#0f766e;
 }
 .lesson-scope .ch-q span{background:#17191c}
